@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Geist, Geist_Mono } from "next/font/google";
+
+const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "Modern Personal Site",
-  description: "A fresh, animated personal landing built with Next.js, Three.js, and Framer Motion",
-  other: {
-    "theme-color": "#0a0a0a",
-  },
+  title: "Personal Landing — Modern 3D & Motion",
+  description: "A fresh personal website with interactive 3D and trending motion.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        {children}
-      </body>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
     </html>
   );
 }

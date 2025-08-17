@@ -1,107 +1,80 @@
 "use client";
 
-import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
-import { Float, MeshDistortMaterial, Environment } from "@react-three/drei";
-import * as React from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Float, OrbitControls, PerspectiveCamera, Sparkles } from "@react-three/drei";
 import * as THREE from "three";
+import { useMemo, useRef, useState } from "react";
 
-type DistortedBlobProps = {
-  colorA?: string;
-  colorB?: string;
-};
+function WavyTorus({ hover }: { hover: boolean }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const torus = useMemo(() => new THREE.TorusKnotGeometry(1.2, 0.35, 220, 28), []);
+  const material = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0.85, 0.6, 1.0),
+        roughness: 0.2,
+        metalness: 0.6,
+        emissive: new THREE.Color(0.15, 0.05, 0.2),
+      }),
+    []
+  );
 
-function DistortedBlob({ colorA = "#6366f1", colorB = "#ec4899" }: DistortedBlobProps) {
-  const meshRef = React.useRef<THREE.Mesh>(null);
-  const targetRotation = React.useRef(new THREE.Euler(0, 0, 0));
-  const hoverProgress = React.useRef(0);
-
-  useFrame((_, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    // Smoothly lerp rotation toward target from pointer
-    mesh.rotation.x += (targetRotation.current.x - mesh.rotation.x) * 0.08;
-    mesh.rotation.y += (targetRotation.current.y - mesh.rotation.y) * 0.08;
-    // Hover spring for subtle scale pulse
-    const speed = 3;
-    hoverProgress.current += (hoverProgress.current > 0 ? -delta * speed : 0);
-    const baseScale = 1;
-    const pulse = Math.max(0, hoverProgress.current);
-    mesh.scale.setScalar(baseScale + pulse * 0.06);
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    if (!meshRef.current) return;
+    meshRef.current.rotation.x = t * 0.25;
+    meshRef.current.rotation.y = t * 0.4;
+    const scaleBase = hover ? 1.15 : 1.0;
+    const pulse = 1 + Math.sin(t * 2.0) * 0.05;
+    meshRef.current.scale.setScalar(scaleBase * pulse);
   });
 
-  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
-    const x = (e.pointer.x ?? 0) as number;
-    const y = (e.pointer.y ?? 0) as number;
-    targetRotation.current.set(y * 0.6, x * 1.0, 0);
-  };
-
-  const onPointerOver = () => {
-    hoverProgress.current = 0.8;
-    document.body.style.cursor = "grab";
-  };
-  const onPointerOut = () => {
-    hoverProgress.current = 0;
-    document.body.style.cursor = "auto";
-  };
-
-  const onPointerDown = () => {
-    document.body.style.cursor = "grabbing";
-  };
-  const onPointerUp = () => {
-    document.body.style.cursor = "grab";
-  };
-
   return (
-    <Float speed={1.2} rotationIntensity={0.4} floatIntensity={0.9}>
-      <mesh
-        ref={meshRef}
-        onPointerMove={onPointerMove}
-        onPointerOver={onPointerOver}
-        onPointerOut={onPointerOut}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-      >
-        <icosahedronGeometry args={[1.4, 64]} />
-        <MeshDistortMaterial
-          attach="material"
-          color={colorA}
-          speed={2.6}
-          roughness={0.2}
-          metalness={0.1}
-          distort={0.45}
-        />
-        {/* Add a subtle fresnel via second sphere */}
-        <mesh scale={1.02}>
-          <icosahedronGeometry args={[1.4, 32]} />
-          <meshStandardMaterial
-            color={colorB}
-            opacity={0.15}
-            transparent
-            metalness={0.8}
-            roughness={0.2}
-            envMapIntensity={1.2}
-          />
-        </mesh>
-      </mesh>
-    </Float>
+    <mesh ref={meshRef} geometry={torus} material={material} castShadow receiveShadow />
   );
 }
 
-export function HeroScene() {
+function ColorShiftLights({ hover }: { hover: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (groupRef.current) {
+      groupRef.current.rotation.y = Math.sin(t * 0.2) * 0.3;
+    }
+  });
   return (
-    <div className="relative w-full h-[420px] md:h-[520px] lg:h-[600px]">
-      <Canvas
-        dpr={[1, 2]}
-        camera={{ fov: 45, position: [0, 0, 5] }}
-        gl={{ antialias: true, alpha: true }}
-      >
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[4, 6, 3]} intensity={1.2} />
-        <directionalLight position={[-5, -2, -3]} intensity={0.25} />
-        <Environment preset="city" />
-        <DistortedBlob />
+    <group ref={groupRef}>
+      <ambientLight intensity={0.3} />
+      <pointLight
+        position={[3, 2, 2]}
+        intensity={hover ? 2.2 : 1.6}
+        color={hover ? new THREE.Color("#f43f5e") : new THREE.Color("#8b5cf6")}
+      />
+      <pointLight position={[-3, -2, -2]} intensity={0.6} color={"#22d3ee"} />
+    </group>
+  );
+}
+
+export default function HeroScene() {
+  const [hover, setHover] = useState(false);
+
+  return (
+    <div
+      className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-indigo-500/10 to-rose-500/10"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true }}>
+        <color attach="background" args={["#0b0b0d"]} />
+        <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50} />
+        <Float speed={hover ? 2.0 : 1.2} floatIntensity={hover ? 1.6 : 1.0}>
+          <WavyTorus hover={hover} />
+        </Float>
+        <Sparkles count={hover ? 200 : 120} size={2} speed={0.4} scale={7} color="#a78bfa" />
+        <ColorShiftLights hover={hover} />
+        <OrbitControls enableZoom={false} enablePan={false} autoRotate={!hover} autoRotateSpeed={0.7} />
       </Canvas>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_40rem_at_60%_50%,rgba(99,102,241,0.15),transparent_50%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(99,102,241,0.15),transparent_45%),radial-gradient(circle_at_30%_70%,rgba(244,63,94,0.12),transparent_40%)]" />
     </div>
   );
 }
